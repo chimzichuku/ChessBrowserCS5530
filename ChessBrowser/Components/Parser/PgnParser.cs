@@ -34,6 +34,8 @@ public class PgnParser
                             CheckEventUniqueness(currentEvent, eventsByKey);
                             currentGame.SetWhitePlayer(currentWhite);
                             currentGame.SetBlackPlayer(currentBlack);
+                            // Add event to game to so eID can be retrieved for foreign key in DB
+                            currentGame.SetEvent(currentEvent);
                             gamesList.Add(currentGame);
                             currentGame = new ChessGame();
                             currentWhite = new ChessPlayer();

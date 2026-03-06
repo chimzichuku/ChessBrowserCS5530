@@ -26,9 +26,14 @@ public class ChessGame
     /// <summary>
     /// 
     /// </summary>
+    private ChessEvent _event;
+
+    /// <summary>
+    /// 
+    /// </summary>
     public ChessGame()
     {
-        
+
     }
 
     /// <summary>
@@ -120,7 +125,7 @@ public class ChessGame
     {
         this._whitePlayer = whitePlayer;
     }
-    
+
     /// <summary>
     /// 
     /// </summary>
@@ -137,5 +142,23 @@ public class ChessGame
     public void SetBlackPlayer(ChessPlayer blackPlayer)
     {
         this._blackPlayer = blackPlayer;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns></returns>
+    public ChessEvent GetEvent()
+    {
+        return _event;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="event"></param>
+    public void SetEvent(ChessEvent @event)
+    {
+        this._event = @event;
     }
 }

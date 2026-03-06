@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using System.Diagnostics;
 using MySql.Data.MySqlClient;
+using ChessBrowser.Components.Parser;
+using ChessBrowser.Components.Models;
 
 namespace ChessBrowser.Components.Pages
 {
@@ -26,7 +28,7 @@ namespace ChessBrowser.Components.Pages
     /// upload operation. Update this value to update 
     /// the progress bar.
     /// </summary>
-    private int    Progress = 0;
+    private int Progress = 0;
 
     /// <summary>
     /// This method runs when a PGN file is selected for upload.
@@ -40,10 +42,12 @@ namespace ChessBrowser.Components.Pages
       // assuimg you've filled in the credentials in the GUI
       string connection = GetConnectionString();
 
-      // TODO:
-      //   Parse the provided PGN data
-      //   We recommend creating separate libraries to represent chess data and load the file
-
+      // Parser expects file path and InsertGameData takes a string array
+      // Create a temporary file to pass to parser
+      string tempFile = Path.GetTempFileName();
+      File.WriteAllLines(tempFile, PGNFileLines);
+      PgnParser.ParseFile(tempFile, out Dictionary<string, ChessPlayer>? players, out Dictionary<(string Name, string Site, String Date), ChessEvent>? events, out List<ChessGame>? games);
+      File.Delete(tempFile);
 
       using (MySqlConnection conn = new MySqlConnection(connection))
       {
@@ -52,19 +56,46 @@ namespace ChessBrowser.Components.Pages
           // Open a connection
           conn.Open();
 
-          // TODO:
-          //   Iterate through your data and generate appropriate insert commands
-                   
-          // TODO:
-          //   Update the Progress member variable every time progress has been made
-          //   (e.g. one iteration of your upload loop)
-          //   This will update the progress bar in the GUI
-          //   Its value should be an integer representing a percentage of completion
-          Progress = 0;
+          // Iterate through your data and generate appropriate insert commands
 
-          // This tells the GUI to redraw after you update Progress (this should go inside your loop)
-          await InvokeAsync(StateHasChanged);
+          List<MySqlCommand> commands = new List<MySqlCommand>();
+
+          if (events != null)
+          {
+            foreach (ChessEvent e in events.Values)
+            {
+              commands.Add(GenerateEventInsertCommand(conn,e));
+            }
+          }
+
+          if (players != null)
+          {
+            foreach (ChessPlayer p in players.Values)
+            {
+              commands.Add(GeneratePlayerInsertCommand(conn, p));
+            }
+          }
+
+          if (games != null)
+          {
+            foreach (ChessGame g in games)
+            {
+              commands.Add(GenerateGameInsertCommand(conn, g));
+            }
+          }
+
+          // Update the Progress member variable every time progress has been made
+          // (e.g. one iteration of your upload loop)
+          // This will update the progress bar in the GUI
+          // Its value should be an integer representing a percentage of completion
+          Progress = 0;
           
+          foreach (MySqlCommand cmd in commands)
+          {
+            cmd.ExecuteNonQuery();
+            Progress += 100 / commands.Count;
+            await InvokeAsync(StateHasChanged);
+          }
 
         }
         catch (Exception e)
@@ -153,7 +184,7 @@ namespace ChessBrowser.Components.Pages
 
           // load the chosen file and split it into an array of strings, one per line
           using var stream = file.OpenReadStream(1000000); // max 1MB
-          using var reader = new StreamReader(stream);                   
+          using var reader = new StreamReader(stream);
           fileContent = await reader.ReadToEndAsync();
           string[] fileLines = fileContent.Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
 
@@ -168,6 +199,58 @@ namespace ChessBrowser.Components.Pages
       }
     }
 
-  }
+    // Helper methods:
 
+    private MySqlCommand GenerateEventInsertCommand(MySqlConnection conn, ChessEvent e)
+    {
+      MySqlCommand cmd = conn.CreateCommand();
+      cmd.CommandText = "INSERT IGNORE INTO Events (Name, Site, Date) VALUES (@Name, @Site, @Date);";
+      cmd.Parameters.AddWithValue("@name", e.GetEventName());
+      cmd.Parameters.AddWithValue("@site", e.GetEventSite());
+      cmd.Parameters.AddWithValue("@date", e.GetEventDate());
+
+      return cmd;
+    }
+
+    private MySqlCommand GeneratePlayerInsertCommand(MySqlConnection conn, ChessPlayer p)
+    {
+      MySqlCommand cmd = conn.CreateCommand();
+      cmd.CommandText = "INSERT INTO Players (Name, Site, Date) VALUES (@Name, @Site, @Date)ON DUPLICATE KEY UPDATE Elo = IF(Elo < @elo, @elo, Elo);";
+      cmd.Parameters.AddWithValue("@name", p.GetPlayerName());
+      cmd.Parameters.AddWithValue("@Elo", p.GetEloRating());
+
+      return cmd;
+    }
+
+    private MySqlCommand GenerateGameInsertCommand(MySqlConnection conn, ChessGame g)
+    {
+      // Get eID to add to Games table as a foreign key to Events table
+      MySqlCommand getEID = conn.CreateCommand();
+      getEID.CommandText = "SELECT eID FROM Events WHERE Name = @name and Site = @site and Date = @date;";
+      getEID.Parameters.AddWithValue("@name", g.GetEvent().GetEventName());
+      getEID.Parameters.AddWithValue("@site", g.GetEvent().GetEventSite());
+      getEID.Parameters.AddWithValue("@date", g.GetEvent().GetEventDate());
+
+      using MySqlDataReader reader = getEID.ExecuteReader();
+      int eID = 0;
+      if(reader.Read())
+      {
+        eID = (int)reader["eID"];
+      }
+
+      MySqlCommand cmd = conn.CreateCommand();
+      cmd.CommandText = "INSERT IGNORE INTO Games (Round, Result, Moves, WhitePlayer, BlackPlayer, eID) VALUES (@round, @result, @moves, @whiteplayer, @blackplayer, @eID);";
+      cmd.Parameters.AddWithValue("@round", g.GetRound());
+      cmd.Parameters.AddWithValue("@result", g.GetResult());
+      cmd.Parameters.AddWithValue("@moves", g.GetMoves());
+      cmd.Parameters.AddWithValue("@whiteplayer", g.GetWhitePlayer().GetPlayerName());
+      cmd.Parameters.AddWithValue("@blackplayer", g.GetBlackPlayer().GetPlayerName());
+      cmd.Parameters.AddWithValue("@eID", eID);
+
+      return cmd;
+    }
+
+  }
 }
+
+
