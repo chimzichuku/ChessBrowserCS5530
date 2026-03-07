@@ -24,11 +24,10 @@ public class PgnParser
                 
                 while ((line = reader.ReadLine()) != null)
                 {
-                    if (String.IsNullOrWhiteSpace(line))
+                    if (string.IsNullOrWhiteSpace(line))
                     {
-                        string? nextLine = reader.ReadLine();
                         
-                        if ( ( nextLine != null && nextLine.StartsWith("[") ) || nextLine == null)
+                        if (!string.IsNullOrWhiteSpace(currentGame.GetMoves()))
                         {
                             CheckPlayerUniqueness(currentBlack, currentWhite, playerByName);
                             CheckEventUniqueness(currentEvent, eventsByKey);
@@ -42,7 +41,7 @@ public class PgnParser
                             currentBlack = new ChessPlayer();
                             currentEvent = new ChessEvent();
                         }
-                        line = nextLine;
+                        continue;
                     }
                     ParseEvent(line, currentEvent);
                     ParseGame(line, currentGame);
@@ -50,6 +49,18 @@ public class PgnParser
                     ParseWhitePlayer(line, currentWhite);
                 }
                 
+                //in the event that the file uploaded does not end with an empty line, this will ensure the last
+                //game is added
+                if (!string.IsNullOrWhiteSpace(currentGame.GetMoves()))
+                {
+                    CheckPlayerUniqueness(currentBlack, currentWhite, playerByName);
+                    CheckEventUniqueness(currentEvent, eventsByKey);
+                    currentGame.SetWhitePlayer(currentWhite);
+                    currentGame.SetBlackPlayer(currentBlack);
+                    // Add event to game to so eID can be retrieved for foreign key in DB
+                    currentGame.SetEvent(currentEvent);
+                    gamesList.Add(currentGame);
+                }
             }
         }
         catch (Exception e)
@@ -64,12 +75,18 @@ public class PgnParser
     private static void CheckPlayerUniqueness(ChessPlayer currentBlack, ChessPlayer currentWhite, Dictionary<string, ChessPlayer> playerByName)
     {
         if (playerByName.TryGetValue(currentWhite.GetPlayerName(), out ChessPlayer? whiteP))
-            whiteP.SetEloRating(currentWhite.GetEloRating());
+        {
+            if (whiteP.GetEloRating() < currentWhite.GetEloRating()) 
+                whiteP.SetEloRating(currentWhite.GetEloRating());
+        }
         else
             playerByName.Add(currentWhite.GetPlayerName(), currentWhite);
-                            
+
         if (playerByName.TryGetValue(currentBlack.GetPlayerName(), out ChessPlayer? blackP))
-            blackP.SetEloRating(currentBlack.GetEloRating());
+        {
+            if (blackP.GetEloRating() < currentBlack.GetEloRating())
+                blackP.SetEloRating(currentBlack.GetEloRating());
+        }
         else
             playerByName.Add(currentBlack.GetPlayerName(), currentBlack);
     }

@@ -57,14 +57,26 @@ namespace ChessBrowser.Components.Pages
           conn.Open();
 
           // Iterate through your data and generate appropriate insert commands
+          Console.Write(games.Count + "\n");
+          Console.Write(players.Count + "\n");
+          Console.WriteLine(events.Count);
 
-          List<MySqlCommand> commands = new List<MySqlCommand>();
-
+          int totalCommands = (events?.Count ?? 0) + (players?.Count ?? 0) + (games?.Count ?? 0);
+          int completed = 0;
           if (events != null)
           {
             foreach (ChessEvent e in events.Values)
             {
-              commands.Add(GenerateEventInsertCommand(conn,e));
+              MySqlCommand cmd = GenerateEventInsertCommand(conn,e);
+              cmd.ExecuteNonQuery();
+              
+              completed++;
+              
+              //this is essentially (completed / totalCommands) * 100, just ensures that the integer returned isnt
+              //0 --> 50/200 == 0 for integers, (completed * 100 / totalCommands) ensures that this doesnt happen
+              Progress = completed * 100 / totalCommands;
+              
+              await InvokeAsync(StateHasChanged);
             }
           }
 
@@ -72,7 +84,11 @@ namespace ChessBrowser.Components.Pages
           {
             foreach (ChessPlayer p in players.Values)
             {
-              commands.Add(GeneratePlayerInsertCommand(conn, p));
+              MySqlCommand cmd = GeneratePlayerInsertCommand(conn, p);
+              cmd.ExecuteNonQuery();
+              completed++;
+              Progress = completed * 100 / totalCommands;
+              await InvokeAsync(StateHasChanged);
             }
           }
 
@@ -80,21 +96,12 @@ namespace ChessBrowser.Components.Pages
           {
             foreach (ChessGame g in games)
             {
-              commands.Add(GenerateGameInsertCommand(conn, g));
+              MySqlCommand cmd = GenerateGameInsertCommand(conn, g);
+              cmd.ExecuteNonQuery();
+              completed++;
+              Progress = completed * 100 / totalCommands;
+              await InvokeAsync(StateHasChanged);
             }
-          }
-
-          // Update the Progress member variable every time progress has been made
-          // (e.g. one iteration of your upload loop)
-          // This will update the progress bar in the GUI
-          // Its value should be an integer representing a percentage of completion
-          Progress = 0;
-          
-          foreach (MySqlCommand cmd in commands)
-          {
-            cmd.ExecuteNonQuery();
-            Progress += 100 / commands.Count;
-            await InvokeAsync(StateHasChanged);
           }
 
         }
@@ -147,7 +154,8 @@ namespace ChessBrowser.Components.Pages
         }
         catch (Exception e)
         {
-          System.Diagnostics.Debug.WriteLine(e.Message);
+          // System.Diagnostics.Debug.WriteLine(e.Message);
+          Console.WriteLine(e.Message);
         }
       }
 
@@ -204,7 +212,7 @@ namespace ChessBrowser.Components.Pages
     private MySqlCommand GenerateEventInsertCommand(MySqlConnection conn, ChessEvent e)
     {
       MySqlCommand cmd = conn.CreateCommand();
-      cmd.CommandText = "INSERT IGNORE INTO Events (Name, Site, Date) VALUES (@Name, @Site, @Date);";
+      cmd.CommandText = "INSERT IGNORE INTO Events (Name, Site, Date) VALUES (@name, @site, @date);";
       cmd.Parameters.AddWithValue("@name", e.GetEventName());
       cmd.Parameters.AddWithValue("@site", e.GetEventSite());
       cmd.Parameters.AddWithValue("@date", e.GetEventDate());
@@ -215,9 +223,9 @@ namespace ChessBrowser.Components.Pages
     private MySqlCommand GeneratePlayerInsertCommand(MySqlConnection conn, ChessPlayer p)
     {
       MySqlCommand cmd = conn.CreateCommand();
-      cmd.CommandText = "INSERT INTO Players (Name, Site, Date) VALUES (@Name, @Site, @Date)ON DUPLICATE KEY UPDATE Elo = IF(Elo < @elo, @elo, Elo);";
+      cmd.CommandText = "INSERT INTO Players (Name, Elo) VALUES (@name, @elo) ON DUPLICATE KEY UPDATE Elo = IF(Elo < @elo, @elo, Elo);";
       cmd.Parameters.AddWithValue("@name", p.GetPlayerName());
-      cmd.Parameters.AddWithValue("@Elo", p.GetEloRating());
+      cmd.Parameters.AddWithValue("@elo", p.GetEloRating());
 
       return cmd;
     }
@@ -231,20 +239,47 @@ namespace ChessBrowser.Components.Pages
       getEID.Parameters.AddWithValue("@site", g.GetEvent().GetEventSite());
       getEID.Parameters.AddWithValue("@date", g.GetEvent().GetEventDate());
 
-      using MySqlDataReader reader = getEID.ExecuteReader();
       int eID = 0;
-      if(reader.Read())
+      int whiteID = 0;
+      int blackID = 0;
+      
+      using (MySqlDataReader reader = getEID.ExecuteReader())
       {
-        eID = (int)reader["eID"];
+        if(reader.Read())
+        {
+          eID = Convert.ToInt32(reader["eID"]);
+        }
+      }
+      
+      //Get White Player ID
+      MySqlCommand getWhiteID = conn.CreateCommand();
+      getWhiteID.CommandText = "Select pID From Players Where Name = @name";
+      getWhiteID.Parameters.AddWithValue("@name", g.GetWhitePlayer().GetPlayerName());
+
+      using (MySqlDataReader reader = getWhiteID.ExecuteReader())
+      {
+        if (reader.Read())
+          whiteID = Convert.ToInt32(reader["pID"]);
+      }
+      
+      //Get Black Player ID
+      MySqlCommand getBlackID = conn.CreateCommand();
+      getBlackID.CommandText = "Select pID From Players Where Name = @name";
+      getBlackID.Parameters.AddWithValue("@name", g.GetBlackPlayer().GetPlayerName());
+
+      using (MySqlDataReader reader = getBlackID.ExecuteReader())
+      {
+        if (reader.Read())
+          blackID = Convert.ToInt32(reader["pID"]);
       }
 
       MySqlCommand cmd = conn.CreateCommand();
-      cmd.CommandText = "INSERT IGNORE INTO Games (Round, Result, Moves, WhitePlayer, BlackPlayer, eID) VALUES (@round, @result, @moves, @whiteplayer, @blackplayer, @eID);";
+      cmd.CommandText = "INSERT INTO Games (Round, Result, Moves, WhitePlayer, BlackPlayer, eID) VALUES (@round, @result, @moves, @whiteplayer, @blackplayer, @eID);";
       cmd.Parameters.AddWithValue("@round", g.GetRound());
       cmd.Parameters.AddWithValue("@result", g.GetResult());
       cmd.Parameters.AddWithValue("@moves", g.GetMoves());
-      cmd.Parameters.AddWithValue("@whiteplayer", g.GetWhitePlayer().GetPlayerName());
-      cmd.Parameters.AddWithValue("@blackplayer", g.GetBlackPlayer().GetPlayerName());
+      cmd.Parameters.AddWithValue("@whiteplayer", whiteID);
+      cmd.Parameters.AddWithValue("@blackplayer", blackID);
       cmd.Parameters.AddWithValue("@eID", eID);
 
       return cmd;
