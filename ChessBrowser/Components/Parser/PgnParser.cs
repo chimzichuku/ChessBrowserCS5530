@@ -2,9 +2,18 @@ using ChessBrowser.Components.Models;
 
 namespace ChessBrowser.Components.Parser;
 
-
+/// <summary>
+/// Class used to hold the methods needed for parsing PGN Files
+/// </summary>
 public class PgnParser
 {
+    /// <summary>
+    /// Reads a PGN file and parses its contents into collections of unique players, unique events, and chess games.
+    /// </summary>
+    /// <param name="filename"> The path to the PGN file to parse</param>
+    /// <param name="players"> Output dictionary containing unique players keyed by player name </param>
+    /// <param name="events"> Output dictionary containing unique events keyed by the tuple (event name, event site, event date </param>
+    /// <param name="games"> Output list containing all parsed chess games from the file </param>
     public static void ParseFile(string filename, out Dictionary<string, ChessPlayer>? players, out Dictionary<(string Name, string Site, String Date), ChessEvent>? events, out List<ChessGame>? games)
     {
         Dictionary<string, ChessPlayer> playerByName = new();
@@ -72,6 +81,13 @@ public class PgnParser
         events = eventsByKey;
     }
 
+    /// <summary>
+    /// Helper method used to check if the Player has already been added. If so, the Elo is updated depending on if the
+    /// new Elo is higher. If it isn't, then the previous Elo remains.
+    /// </summary>
+    /// <param name="currentBlack"> The current black player that is playing in the current game </param>
+    /// <param name="currentWhite"> The current white player that is playing in the current game </param>
+    /// <param name="playerByName"> Dictionary containing all unique players </param>
     private static void CheckPlayerUniqueness(ChessPlayer currentBlack, ChessPlayer currentWhite, Dictionary<string, ChessPlayer> playerByName)
     {
         if (playerByName.TryGetValue(currentWhite.GetPlayerName(), out ChessPlayer? whiteP))
@@ -91,12 +107,22 @@ public class PgnParser
             playerByName.Add(currentBlack.GetPlayerName(), currentBlack);
     }
 
+    /// <summary>
+    /// Method used to check if an event is unique. If it is, it is added to teh events dictionary. If not, nothing happens.
+    /// </summary>
+    /// <param name="currentEvent"> The current event that is hosting the current game. </param>
+    /// <param name="eventsByKey"> Dictionary containing all the unique events </param>
     private static void CheckEventUniqueness(ChessEvent currentEvent, Dictionary<(string Name, string Site, String Date), ChessEvent> eventsByKey)
     {
         if(!eventsByKey.TryGetValue((currentEvent.GetEventName(), currentEvent.GetEventSite(), currentEvent.GetEventDate()), out ChessEvent? value))
             eventsByKey.Add((currentEvent.GetEventName(), currentEvent.GetEventSite(), currentEvent.GetEventDate()), currentEvent);
     }
 
+    /// <summary>
+    /// This helper method is used to determine if the current line is containing information for the current event
+    /// </summary>
+    /// <param name="line"> The line of text extracted from the PGN file </param>
+    /// <param name="currentEvent"> The current event taking place </param>
     private static void ParseEvent(string line, ChessEvent currentEvent)
     {
         if (line.StartsWith("[Event "))
@@ -123,6 +149,11 @@ public class PgnParser
         }
     }
 
+    /// <summary>
+    /// This helper method is used to determine if the current line is containing information for the current game
+    /// </summary>
+    /// <param name="line"> The line of text extracted from the PGN file </param>
+    /// <param name="currentGame"> The current game taking place </param>
     private static void ParseGame(string line, ChessGame currentGame)
     {
         if (line.StartsWith("[Round"))
@@ -151,6 +182,11 @@ public class PgnParser
         }
     }
 
+    /// <summary>
+    /// This helper method is used to determine if the current line is containing information for the current white player
+    /// </summary>
+    /// <param name="line"> The line of text extracted from the PGN file </param>
+    /// <param name="currentWhite"> The current white player in the current game taking place </param>
     private static void ParseWhitePlayer(string line, ChessPlayer currentWhite)
     {
         if (line.StartsWith("[White "))
@@ -166,6 +202,11 @@ public class PgnParser
         }
     }
 
+    /// <summary>
+    /// This helper method is used to determine if the current line is containing information for the current black player
+    /// </summary>
+    /// <param name="line"> The line of text extracted from the PGN file </param>
+    /// <param name="currentBlack"> The current black player in the current game taking place </param>
     private static void ParseBlackPlayer(string line, ChessPlayer currentBlack)
     {
         if (line.StartsWith("[Black "))

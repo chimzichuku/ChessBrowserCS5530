@@ -58,10 +58,6 @@ namespace ChessBrowser.Components.Pages
           conn.Open();
 
           // Iterate through your data and generate appropriate insert commands
-          Console.Write(games.Count + "\n");
-          Console.Write(players.Count + "\n");
-          Console.WriteLine(events.Count);
-
           int totalCommands = (events?.Count ?? 0) + (players?.Count ?? 0) + (games?.Count ?? 0);
           int completed = 0;
           if (events != null)
@@ -304,25 +300,25 @@ namespace ChessBrowser.Components.Pages
     {
       List<string> conditions = new List<string>();
 
-      if (whitePlayer != "")
+      if (!string.IsNullOrWhiteSpace(whitePlayer))
       {
         conditions.Add("p1.Name = @whiteplayer");
         cmd.Parameters.AddWithValue("@whiteplayer", whitePlayer);
       }
 
-      if (blackPlayer != "")
+      if (!string.IsNullOrWhiteSpace(blackPlayer))
       {
         conditions.Add("p2.Name = @blackplayer");
         cmd.Parameters.AddWithValue("@blackplayer", blackPlayer);
       }
 
-      if (openingMove != "")
+      if (!string.IsNullOrWhiteSpace(openingMove))
       {
         conditions.Add("g.Moves LIKE @openingmove");
         cmd.Parameters.AddWithValue("@openingmove", openingMove + "%");
       }
 
-      if (winner != "")
+      if (!string.IsNullOrWhiteSpace(winner))
       {
         conditions.Add("g.Result = @winner");
         cmd.Parameters.AddWithValue("@winner", winner);
