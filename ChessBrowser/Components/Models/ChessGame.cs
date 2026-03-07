@@ -9,18 +9,22 @@ public class ChessGame
     /// Game's round
     /// </summary>
     private string _round;
+
     /// <summary>
     /// Result of game
     /// </summary>
     private string _result;
+
     /// <summary>
     /// Moves made in game
     /// </summary>
     private string _moves;
+
     /// <summary>
     /// White player in game
     /// </summary>
     private ChessPlayer _whitePlayer;
+
     /// <summary>
     /// Black player in game
     /// </summary>
@@ -36,7 +40,6 @@ public class ChessGame
     /// </summary>
     public ChessGame()
     {
-
     }
 
     /// <summary>
@@ -48,7 +51,8 @@ public class ChessGame
     /// <param name="whitePlayer"> Game's white player </param>
     /// <param name="blackPlayer"> Game's black player </param>
     /// <param name="@event"> Event holding the game </param>
-    public ChessGame(string round, string result, string moves, ChessPlayer whitePlayer, ChessPlayer blackPlayer, ChessEvent @event)
+    public ChessGame(string round, string result, string moves, ChessPlayer whitePlayer, ChessPlayer blackPlayer,
+        ChessEvent @event)
     {
         this._round = round;
         this._result = result;

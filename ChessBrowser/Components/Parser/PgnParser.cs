@@ -14,28 +14,28 @@ public class PgnParser
     /// <param name="players"> Output dictionary containing unique players keyed by player name </param>
     /// <param name="events"> Output dictionary containing unique events keyed by the tuple (event name, event site, event date </param>
     /// <param name="games"> Output list containing all parsed chess games from the file </param>
-    public static void ParseFile(string filename, out Dictionary<string, ChessPlayer>? players, out Dictionary<(string Name, string Site, String Date), ChessEvent>? events, out List<ChessGame>? games)
+    public static void ParseFile(string filename, out Dictionary<string, ChessPlayer>? players,
+        out Dictionary<(string Name, string Site, String Date), ChessEvent>? events, out List<ChessGame>? games)
     {
         Dictionary<string, ChessPlayer> playerByName = new();
         Dictionary<(string Name, string Site, String Date), ChessEvent> eventsByKey = new();
         List<ChessGame> gamesList = new();
-        
+
         try
         {
             using (StreamReader reader = new StreamReader(filename))
             {
                 string? line;
-                
+
                 ChessGame currentGame = new ChessGame();
                 ChessPlayer currentWhite = new ChessPlayer();
                 ChessPlayer currentBlack = new ChessPlayer();
                 ChessEvent currentEvent = new ChessEvent();
-                
+
                 while ((line = reader.ReadLine()) != null)
                 {
                     if (string.IsNullOrWhiteSpace(line))
                     {
-                        
                         if (!string.IsNullOrWhiteSpace(currentGame.GetMoves()))
                         {
                             CheckPlayerUniqueness(currentBlack, currentWhite, playerByName);
@@ -50,14 +50,16 @@ public class PgnParser
                             currentBlack = new ChessPlayer();
                             currentEvent = new ChessEvent();
                         }
+
                         continue;
                     }
+
                     ParseEvent(line, currentEvent);
                     ParseGame(line, currentGame);
                     ParseBlackPlayer(line, currentBlack);
                     ParseWhitePlayer(line, currentWhite);
                 }
-                
+
                 //in the event that the file uploaded does not end with an empty line, this will ensure the last
                 //game is added
                 if (!string.IsNullOrWhiteSpace(currentGame.GetMoves()))
@@ -76,6 +78,7 @@ public class PgnParser
         {
             Console.WriteLine($"File could not be read with message: {e.Message}");
         }
+
         players = playerByName;
         games = gamesList;
         events = eventsByKey;
@@ -88,11 +91,12 @@ public class PgnParser
     /// <param name="currentBlack"> The current black player that is playing in the current game </param>
     /// <param name="currentWhite"> The current white player that is playing in the current game </param>
     /// <param name="playerByName"> Dictionary containing all unique players </param>
-    private static void CheckPlayerUniqueness(ChessPlayer currentBlack, ChessPlayer currentWhite, Dictionary<string, ChessPlayer> playerByName)
+    private static void CheckPlayerUniqueness(ChessPlayer currentBlack, ChessPlayer currentWhite,
+        Dictionary<string, ChessPlayer> playerByName)
     {
         if (playerByName.TryGetValue(currentWhite.GetPlayerName(), out ChessPlayer? whiteP))
         {
-            if (whiteP.GetEloRating() < currentWhite.GetEloRating()) 
+            if (whiteP.GetEloRating() < currentWhite.GetEloRating())
                 whiteP.SetEloRating(currentWhite.GetEloRating());
         }
         else
@@ -112,10 +116,14 @@ public class PgnParser
     /// </summary>
     /// <param name="currentEvent"> The current event that is hosting the current game. </param>
     /// <param name="eventsByKey"> Dictionary containing all the unique events </param>
-    private static void CheckEventUniqueness(ChessEvent currentEvent, Dictionary<(string Name, string Site, String Date), ChessEvent> eventsByKey)
+    private static void CheckEventUniqueness(ChessEvent currentEvent,
+        Dictionary<(string Name, string Site, String Date), ChessEvent> eventsByKey)
     {
-        if(!eventsByKey.TryGetValue((currentEvent.GetEventName(), currentEvent.GetEventSite(), currentEvent.GetEventDate()), out ChessEvent? value))
-            eventsByKey.Add((currentEvent.GetEventName(), currentEvent.GetEventSite(), currentEvent.GetEventDate()), currentEvent);
+        if (!eventsByKey.TryGetValue(
+                (currentEvent.GetEventName(), currentEvent.GetEventSite(), currentEvent.GetEventDate()),
+                out ChessEvent? value))
+            eventsByKey.Add((currentEvent.GetEventName(), currentEvent.GetEventSite(), currentEvent.GetEventDate()),
+                currentEvent);
     }
 
     /// <summary>
@@ -130,19 +138,19 @@ public class PgnParser
             string eventName = line.Split('"')[1];
             currentEvent.SetEventName(eventName);
         }
-        
+
         if (line.StartsWith("[Site"))
         {
             string siteName = line.Split('"')[1];
             currentEvent.SetEventSite(siteName);
         }
-        
+
         if (line.StartsWith("[EventDate"))
         {
             string date = line.Split('"')[1];
             string[] dateValues = date.Split(".");
-            
-            if ( dateValues.Length == 3 && !date.Contains("?") )
+
+            if (dateValues.Length == 3 && !date.Contains("?"))
                 currentEvent.SetEventDate($"{dateValues[0]}-{dateValues[1]}-{dateValues[2]}");
             else
                 currentEvent.SetEventDate("0000-00-00");
@@ -161,18 +169,18 @@ public class PgnParser
             string round = line.Split('"')[1];
             currentGame.SetRound(round);
         }
-        
+
         if (line.StartsWith("[Result"))
         {
             string result = line.Split('"')[1];
-            if( result == "1-0")
+            if (result == "1-0")
                 currentGame.SetResult("W");
             else if (result == "0-1")
                 currentGame.SetResult("B");
-            else if(result == "1/2-1/2")
+            else if (result == "1/2-1/2")
                 currentGame.SetResult("D");
         }
-        
+
         if (!line.StartsWith("["))
         {
             if (line.StartsWith("1."))
@@ -194,7 +202,7 @@ public class PgnParser
             string whitePName = line.Split('"')[1];
             currentWhite.SetPlayerName(whitePName);
         }
-        
+
         if (line.StartsWith("[WhiteElo"))
         {
             string whiteElo = line.Split('"')[1];
@@ -214,7 +222,7 @@ public class PgnParser
             string blackPName = line.Split('"')[1];
             currentBlack.SetPlayerName(blackPName);
         }
-        
+
         if (line.StartsWith("[BlackElo"))
         {
             string blackElo = line.Split('"')[1];

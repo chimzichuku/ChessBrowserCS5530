@@ -9,6 +9,7 @@ public class ChessPlayer
     /// The name of the player
     /// </summary>
     private string _name;
+
     /// <summary>
     /// The Elo rating of the player
     /// </summary>
@@ -19,7 +20,6 @@ public class ChessPlayer
     /// </summary>
     public ChessPlayer()
     {
-        
     }
 
     /// <summary>

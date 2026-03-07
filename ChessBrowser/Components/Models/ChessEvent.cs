@@ -9,10 +9,12 @@ public class ChessEvent
     /// Name of event
     /// </summary>
     private string _eventName;
+
     /// <summary>
     /// Site where event is taking place
     /// </summary>
     private string _eventSite;
+
     /// <summary>
     /// Date of the event
     /// </summary>
@@ -23,7 +25,6 @@ public class ChessEvent
     /// </summary>
     public ChessEvent()
     {
-        
     }
 
     /// <summary>
