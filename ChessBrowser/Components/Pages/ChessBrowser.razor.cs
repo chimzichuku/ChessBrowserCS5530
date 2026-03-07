@@ -3,6 +3,7 @@ using System.Diagnostics;
 using MySql.Data.MySqlClient;
 using ChessBrowser.Components.Parser;
 using ChessBrowser.Components.Models;
+using System.Runtime.InteropServices;
 
 namespace ChessBrowser.Components.Pages
 {
@@ -67,15 +68,15 @@ namespace ChessBrowser.Components.Pages
           {
             foreach (ChessEvent e in events.Values)
             {
-              MySqlCommand cmd = GenerateEventInsertCommand(conn,e);
+              MySqlCommand cmd = GenerateEventInsertCommand(conn, e);
               cmd.ExecuteNonQuery();
-              
+
               completed++;
-              
+
               //this is essentially (completed / totalCommands) * 100, just ensures that the integer returned isnt
               //0 --> 50/200 == 0 for integers, (completed * 100 / totalCommands) ensures that this doesnt happen
               Progress = completed * 100 / totalCommands;
-              
+
               await InvokeAsync(StateHasChanged);
             }
           }
@@ -148,9 +149,23 @@ namespace ChessBrowser.Components.Pages
           // Open a connection
           conn.Open();
 
-          // TODO:
-          //   Generate and execute an SQL command,
-          //   then parse the results into an appropriate string and return it.
+          // Generate and execute an SQL command,
+          // then parse the results into an appropriate string and return it.
+
+          MySqlCommand cmd = conn.CreateCommand();
+          string whereConditions = BuildWhereCondition(white, black, opening, winner, useDate, start, end, cmd);
+          cmd.CommandText = BuildSelectQuery(showMoves) + whereConditions;
+
+          using (MySqlDataReader reader = cmd.ExecuteReader())
+          {
+            while (reader.Read())
+            {
+              numRows ++;
+              parsedResult += BuildResultString(reader, showMoves);
+            }
+          }
+
+
         }
         catch (Exception e)
         {
@@ -242,15 +257,15 @@ namespace ChessBrowser.Components.Pages
       int eID = 0;
       int whiteID = 0;
       int blackID = 0;
-      
+
       using (MySqlDataReader reader = getEID.ExecuteReader())
       {
-        if(reader.Read())
+        if (reader.Read())
         {
           eID = Convert.ToInt32(reader["eID"]);
         }
       }
-      
+
       //Get White Player ID
       MySqlCommand getWhiteID = conn.CreateCommand();
       getWhiteID.CommandText = "Select pID From Players Where Name = @name";
@@ -261,7 +276,7 @@ namespace ChessBrowser.Components.Pages
         if (reader.Read())
           whiteID = Convert.ToInt32(reader["pID"]);
       }
-      
+
       //Get Black Player ID
       MySqlCommand getBlackID = conn.CreateCommand();
       getBlackID.CommandText = "Select pID From Players Where Name = @name";
@@ -274,7 +289,7 @@ namespace ChessBrowser.Components.Pages
       }
 
       MySqlCommand cmd = conn.CreateCommand();
-      cmd.CommandText = "INSERT INTO Games (Round, Result, Moves, WhitePlayer, BlackPlayer, eID) VALUES (@round, @result, @moves, @whiteplayer, @blackplayer, @eID);";
+      cmd.CommandText = "INSERT IGNORE INTO Games (Round, Result, Moves, WhitePlayer, BlackPlayer, eID) VALUES (@round, @result, @moves, @whiteplayer, @blackplayer, @eID);";
       cmd.Parameters.AddWithValue("@round", g.GetRound());
       cmd.Parameters.AddWithValue("@result", g.GetResult());
       cmd.Parameters.AddWithValue("@moves", g.GetMoves());
@@ -285,7 +300,79 @@ namespace ChessBrowser.Components.Pages
       return cmd;
     }
 
+    private string BuildWhereCondition(string whitePlayer, string blackPlayer, string openingMove, string winner, bool useDateFilter, DateTime startDate, DateTime endDate, MySqlCommand cmd)
+    {
+      List<string> conditions = new List<string>();
+
+      if (whitePlayer != "")
+      {
+        conditions.Add("p1.Name = @whiteplayer");
+        cmd.Parameters.AddWithValue("@whiteplayer", whitePlayer);
+      }
+
+      if (blackPlayer != "")
+      {
+        conditions.Add("p2.Name = @blackplayer");
+        cmd.Parameters.AddWithValue("@blackplayer", blackPlayer);
+      }
+
+      if (openingMove != "")
+      {
+        conditions.Add("g.Moves LIKE @openingmove");
+        cmd.Parameters.AddWithValue("@openingmove", openingMove + "%");
+      }
+
+      if (winner != "")
+      {
+        conditions.Add("g.Result = @winner");
+        cmd.Parameters.AddWithValue("@winner", winner);
+      }
+
+      if (useDateFilter)
+      {
+        conditions.Add("e.Date >= @startDate AND e.Date <= @endDate");
+        cmd.Parameters.AddWithValue("@startDate", startDate);
+        cmd.Parameters.AddWithValue("@endDate", endDate);
+      }
+
+      if (conditions.Count > 0)
+      {
+        return "WHERE " + string.Join(" AND ", conditions);
+      }
+      else
+      {
+        return "";
+      }
+    }
+
+    private string BuildSelectQuery(bool showMoves)
+    {
+      string moves = "";
+
+      if (showMoves)
+      {
+        moves = ", g.Moves";
+      }
+
+      return "SELECT e.Name as eName, e.Site, e.Date, p1.Name as wName, p1.Elo as wElo, p2.Name as bName, p2.Elo as bElo, g.Result" + moves + " " + "FROM Games g " + "JOIN Events e ON g.eID = e.eID " + "JOIN Players p1 ON g.WhitePlayer = p1.pID " + "JOIN Players p2 ON g.BlackPlayer = p2.pID ";
+    }
+
+    private string BuildResultString(MySqlDataReader reader, bool showMoves)
+    {
+      string result = "\nEvent: " + reader["eName"] + "\nSite: " + reader["Site"] + "\nDate: " + reader["Date"] + "\nWhite: " + reader["wName"] + " (" + reader["wElo"] + ")\nBlack: " + reader["bName"] + " (" + reader["bElo"] + ")\nResult: " + reader["Result"];
+
+      if (showMoves)
+      {
+        result += "\n" + reader["Moves"];
+      }
+
+      result += "\n";
+
+      return result;
+    }
+
   }
+
 }
 
 
